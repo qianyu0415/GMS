@@ -2,20 +2,13 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
-# 定义课程数据模型
-class Course(db.Model):
-    __tablename__ = 'courses'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    major_id = db.Column(db.Integer, nullable=False)
-    course_name = db.Column(db.String(255), nullable=False)
-    course_type = db.Column(db.String(100), nullable=False)
-
 # 定义学分结果模型
 class CreditResult(db.Model):
     __tablename__ = 'credit_results'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    student_name = db.Column(db.String(100), nullable=False)
-    major = db.Column(db.String(100), nullable=False)
+    
+    student_name = db.Column(db.String(100), primary_key=True, nullable=False)
+    student_id = db.Column(db.String(15), primary_key=True, nullable=False)
+    major = db.Column(db.String(100), primary_key=True, nullable=False)
     spring_required_credits = db.Column(db.Float)
     autumn_required_credits = db.Column(db.Float)
     spring_core_credits = db.Column(db.Float)
