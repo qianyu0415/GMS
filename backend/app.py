@@ -6,6 +6,7 @@ import pymysql
 from models import db, CreditResult
 from sqlalchemy import text
 from course_checker import check_missing_courses  # 查找缺失课程
+from other import calculate_credits_for_all_students  # 导入计算学分的函数
 # 使用 pymysql 替代 MySQLdb
 pymysql.install_as_MySQLdb()
 
@@ -86,7 +87,7 @@ def upload_file():
                 continue  # 如果创建表失败，跳过此学生
 
             # 插入学生的选课信息
-            for index, row in student_data.iterrows():
+            for row in student_data.iterrows():
                 insert_query = text(f"""
                 INSERT INTO `{table_name}` (course_name, academic_year, course_nature, course_category, final_grade, retake_remark, credits, major)
                 VALUES (:course_name, :academic_year, :course_nature, :course_category, :final_grade, :retake_remark, :credits, :major);
@@ -109,116 +110,64 @@ def upload_file():
     # 提交更改
     try:
         db.session.commit()
-        return jsonify({'message': '学生选课信息已成功存储在数据库中。'}), 200
+
+        # 调用学分计算函数，传递数据库配置
+        db_config = {
+            'host': 'localhost',
+            'port': 3306,
+            'user': 'root',
+            'password': '123456',
+            'database': 'credits_db'
+        }
+        
+        # 日志记录以跟踪学分计算状态
+        print("开始学分计算...")
+        calculate_credits_for_all_students(db_config)
+        print("学分计算完成")
+
+        return jsonify({'message': '学生选课信息已成功存储在数据库中，并完成学分计算。'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f"提交更改时出错: {e}"}), 500
 
+
 # 删除所有学生表
-@app.route('/delete_all_student_tables', methods=['POST'])
+import logging
+logging.basicConfig(level=logging.INFO)
+
+@app.route('/delete_all_student_tables', methods=['GET'])
 def delete_all_student_tables():
     try:
-        # 使用更严格的条件来筛选符合命名格式的表
         with db.engine.connect() as connection:
-            # 查询符合 student_name_student_id_major 格式的表
-            # 假设 student_id 为 10 位数字
-            get_tables_query = text("SHOW TABLES LIKE '%\_%__________\_%'")
+            # 查询并删除符合条件的学生表
+            get_tables_query = text("SHOW TABLES LIKE '%\\_%__________\\_%'")
             result = connection.execute(get_tables_query)
             tables_to_delete = [row[0] for row in result.fetchall()]
-
-            # 删除找到的所有表
             for table_name in tables_to_delete:
                 drop_table_query = text(f"DROP TABLE IF EXISTS `{table_name}`")
                 connection.execute(drop_table_query)
-        
-        return jsonify({'message': '所有符合格式的学生表已成功删除。'}), 200
+
+            # 删除 credit_results 表中的所有记录
+            delete_credit_results_query = text("DELETE FROM credit_results")
+            connection.execute(delete_credit_results_query)
+            print("Successfully executed DELETE FROM credit_results.")
+            connection.commit()  # 使用 connection.commit() 明确提交事务
+
+        return jsonify({'message': '所有符合格式的学生表及 credit_results 表中的记录已成功删除。'}), 200
 
     except Exception as e:
-        return jsonify({'error': f"删除学生表时出错: {e}"}), 500
+        print(f"Error occurred: {e}")
+        return jsonify({'error': f"删除学生表或 credit_results 记录时出错: {e}"}), 500
+
     
 # 路由：检查缺失课程
 @app.route('/check_missing_courses', methods=['POST'])
 def handle_check_missing_courses():
     data = request.json
+    # print("Received data:", data)  # 打印接收到的数据
     result, status_code = check_missing_courses(data)
+    # print(result, status_code)
     return jsonify(result), status_code
-
-# # 处理多个 Excel 文件上传和解析
-# @app.route('/upload', methods=['POST'])
-# def upload_file():
-#     if 'file' not in request.files:
-#         app.logger.error('没有文件上传')
-#         return jsonify({'error': '没有文件上传'}), 400
-
-#     files = request.files.getlist('file')  # 获取多个文件
-#     if len(files) == 0:
-#         app.logger.error('没有选择文件')
-#         return jsonify({'error': '没有选择文件'}), 400
-
-#     results = []  # 存储所有文件处理的结果
-
-#     for file in files:
-#         if not allowed_file(file.filename):
-#             app.logger.error('不支持的文件格式: %s', file.filename)
-#             return jsonify({'error': f'不支持的文件格式: {file.filename}'}), 400
-
-#         # 保存文件到上传目录
-#         filename = file.filename
-#         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-#         file.save(file_path)
-
-#         app.logger.info(f"文件保存成功: {file_path}")
-
-#         # 解析文件名确定专业
-#         current_major = extract_major_from_filename(filename)
-#         if current_major is None:
-#             app.logger.error('无法识别专业，文件名: %s', filename)
-#             return jsonify({'error': f'无法识别专业，文件名: {filename}'}), 400
-
-#         # 读取并处理 Excel 文件
-#         try:
-#             df = pd.read_excel(file_path)
-
-#             # 通过 current_major 获取该专业对应的核心课程
-#             result = calculate_credits(df, current_major)
-
-#             # 从前端获取 student_name 和 major
-#             student_name = request.form.get('student_name', '未命名学生')
-#             major = request.form.get('major', '未命名专业')
-
-#             # 将结果存储到数据库
-#             credit_entry = CreditResult(
-#                 student_name=student_name,
-#                 major=major,
-#                 spring_required_credits=result['春季必修学分'],
-#                 autumn_required_credits=result['秋季必修学分'],
-#                 spring_core_credits=result['春季核心课程学分'],
-#                 autumn_core_credits=result['秋季核心课程学分'],
-#                 numerical_logic_credits=result['数字逻辑学分'],
-#                 spring_limited_credits=result['春季限选学分'],
-#                 autumn_limited_credits=result['秋季限选学分'],
-#                 short_term_training_credits=result['企业短期实训/专业实践学分'],
-#                 international_credits=result['国际化课程学分'],
-#                 elective_credits=result['专业选修学分'],
-#                 outmajor_credits=result['外专业学分'],
-#                 culture_core_credits=result['素质核心学分'],
-#                 culture_choose_credits=result['素质选修学分'],
-#                 culture_total_credits=result['文化素质教育学分'],
-#                 innovation_credits=result['创新创业学分']
-#             )
-
-#             db.session.add(credit_entry)
-#             db.session.commit()
-
-#             # 添加处理结果到结果列表
-#             results.append({filename: result})
-
-#         except Exception as e:
-#             app.logger.error('文件解析失败: %s', str(e))
-#             return jsonify({'error': str(e)}), 500
-
-#     # 返回所有文件的处理结果
-#     return jsonify(results)
 
 @app.route('/data', methods=['GET'])
 def get_data():
@@ -229,123 +178,45 @@ def get_data():
         # 将查询结果转换为 JSON 格式
         result_list = []
         for result in credit_results:
+            # 确保 MOOC 是一个 JSON 可序列化的对象
+            mooc_data = result.MOOC if isinstance(result.MOOC, list) else []
+
             result_list.append({
                 'student_name': result.student_name,
-                'student_id': result.student_id,  # 使用 student_id 而不是 id
+                'student_id': result.student_id,
                 'major': result.major,
-                'spring_required_credits': result.spring_required_credits,
-                'autumn_required_credits': result.autumn_required_credits,
-                'spring_core_credits': result.spring_core_credits,
-                'autumn_core_credits': result.autumn_core_credits,
-                'numerical_logic_credits': result.numerical_logic_credits,
-                'spring_limited_credits': result.spring_limited_credits,
-                'autumn_limited_credits': result.autumn_limited_credits,
-                'short_term_training_credits': result.short_term_training_credits,
-                'international_credits': result.international_credits,
-                'elective_credits': result.elective_credits,
-                'outmajor_credits': result.outmajor_credits,
-                'culture_core_credits': result.culture_core_credits,
-                'culture_choose_credits': result.culture_choose_credits,
-                'culture_total_credits': result.culture_total_credits,
-                'innovation_credits': result.innovation_credits
+                # 春季秋季的必修未统计
+                'spring_required_credits': result.spring_required_credits or 0,
+                'autumn_required_credits': result.autumn_required_credits or 0,
+                # 专业核心课
+                'core_credits': result.core_credits or 0,
+                # 数字逻辑3分
+                'numerical_logic_credits': result.numerical_logic_credits or 0,
+                # 春秋限选未统计
+                'limited_credits': result.limited_credits or 0,
+                # 企业短期实训&夏季实践：2分
+                'short_term_training_credits': (result.short_term_training_credits or 0) - 2,
+                # 国际化课程1分
+                'international_credits': (result.international_credits or 0) - 1,
+                # 专业选修课总分9分
+                'elective_credits': (result.elective_credits or 0) - 9,
+                # 外专业课程6分
+                'outmajor_credits': (result.outmajor_credits or 0) - 6,
+                # 素质核心4分
+                'culture_core_credits': result.culture_core_credits or 0,
+                # 素质选修5分
+                'culture_choose_credits': result.culture_choose_credits or 0,
+                # MOOC，确保返回列表
+                'MOOC': mooc_data,
+                # 创新学分4分
+                'innovation_credits': (result.innovation_credits or 0) - 1
             })
 
-        return jsonify(result_list)
+        return jsonify(result_list), 200
     except Exception as e:
         app.logger.error(f"数据获取失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# @app.route('/delete', methods=['POST', 'OPTIONS'])
-# def delete_record():
-#     if request.method == 'OPTIONS':
-#         return '', 200
-#     try:
-#         data = request.get_json()
-#         print(f"接收到的数据: {data}")  # 打印接收到的请求数据
-#         student_name = data.get('student_name')
-#         major = data.get('major')
-
-#         if not student_name or not major:
-#             return jsonify({'error': 'Student name and major are required'}), 400
-
-#         # 查找要删除的记录
-#         record = CreditResult.query.filter_by(student_name=student_name, major=major).first()
-#         if record is None:
-#             return jsonify({'error': 'Record not found'}), 404
-
-#         # 删除记录
-#         db.session.delete(record)
-#         db.session.commit()
-#         return jsonify({'message': 'Record deleted successfully'}), 200
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
-
-
-# 批量删除路由也需要添加 OPTIONS 方法
-# @app.route('/delete_batch', methods=['POST', 'OPTIONS'])
-# def delete_records():
-#     if request.method == 'OPTIONS':
-#         return '', 200
-#     try:
-#         data = request.get_json()
-#         print(f"接收到的数据: {data}")  # 打印接收到的请求数据
-#         records = data.get('records')  # 接收前端传来的多个记录
-        
-#         if not records:
-#             return jsonify({'error': 'No records to delete'}), 400
-
-#         for record in records:
-#             student_name = record.get('student_name')
-#             major = record.get('major')
-
-#             if not student_name or not major:
-#                 return jsonify({'error': f'Student name and major are required for {record}'}), 400
-
-#             # 查找并删除记录
-#             db_record = CreditResult.query.filter_by(student_name=student_name, major=major).first()
-#             if db_record:
-#                 db.session.delete(db_record)
-#             else:
-#                 print(f"No record found for student {student_name} with major {major}")
-
-#         db.session.commit()  # 提交一次性提交所有删除操作
-#         return jsonify({'message': 'Records deleted successfully'}), 200
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
-
-
-# @app.route('/search', methods=['GET'])
-# def search_records():
-#     query = request.args.get('query', '')
-    
-#     # 根据关键词在数据库中进行模糊查询
-#     results = CreditResult.query.filter(
-#         (CreditResult.student_name.like(f'%{query}%')) | 
-#         (CreditResult.major.like(f'%{query}%'))
-#     ).all()
-
-#     # 将查询结果转换为 JSON 格式返回
-#     records = [{
-#         'student_name': result.student_name,
-#         'major': result.major,
-#         'spring_required_credits': result.spring_required_credits,
-#         'autumn_required_credits': result.autumn_required_credits,
-#         'spring_core_credits': result.spring_core_credits,
-#         'autumn_core_credits': result.autumn_core_credits,
-#         'numerical_logic_credits': result.numerical_logic_credits,
-#         'spring_limited_credits': result.spring_limited_credits,
-#         'autumn_limited_credits': result.autumn_limited_credits,
-#         'short_term_training_credits': result.short_term_training_credits,
-#         'international_credits': result.international_credits,
-#         'elective_credits': result.elective_credits,
-#         'outmajor_credits': result.outmajor_credits,
-#         'culture_core_credits': result.culture_core_credits,
-#         'culture_choose_credits': result.culture_choose_credits,
-#         'culture_total_credits': result.culture_total_credits,
-#         'innovation_credits': result.innovation_credits
-#     } for result in results]
-
-    # return jsonify(records)
 # 启动 Flask 应用
 if __name__ == '__main__':
     with app.app_context():  # 确保数据库操作在应用上下文中执行

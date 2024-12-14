@@ -3,6 +3,7 @@ from models import Course
 
 # 从数据库获取专业核心课程
 def get_core_courses_by_major(major_id):
+    #计算机科学：core_courese_1
     core_courses = Course.query.filter_by(major_id=major_id, course_type='专业核心').all()
     return [course.course_name for course in core_courses]
 

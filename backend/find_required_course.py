@@ -1,35 +1,17 @@
 # find_required_course.py
-import os
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from db_config import get_engine
 
-# 数据库连接配置
-db_config = 'mysql+pymysql://root:123456@localhost:3306/credits_db'
-
-# 创建数据库连接
-engine = create_engine(db_config)
+# 创建数据库引擎
+engine = get_engine()
 
 def process_courses(student_table, required_course_table):
     """
-    处理单个学生表和课程要求表，返回春季学分、秋季学分和缺失课程列表。
+    处理单个学生表和课程要求表，返回春季、秋季必修课学分
+    首先先把对应专业的required和学生表相连进行选择
+    因为英语比较特殊（required里面都是“大学外语”），所以单独计算
+    返回时加载一起
     """
-    # 找出未选修的课程
-    missing_query = text(f"""
-        SELECT
-            rc.course_name,
-            rc.academic_year,
-            rc.credits
-        FROM `{required_course_table}` rc
-        LEFT JOIN `{student_table}` s
-        ON rc.course_name = s.course_name AND rc.academic_year = s.academic_year
-        WHERE s.course_name IS NULL AND rc.course_name IS NOT NULL AND rc.academic_year IS NOT NULL;
-    """)
-
-    with engine.connect() as connection:
-        result = connection.execute(missing_query).fetchall()
-
-    # 记录未选修课程的名称和学年
-    missing_courses = [(row[0], row[1]) for row in result]
-
     # 计算已选课程的春季和秋季总学分
     credits_query = text(f"""
         SELECT 
@@ -47,24 +29,28 @@ def process_courses(student_table, required_course_table):
     spring_credits = credits_result[0] if credits_result and credits_result[0] is not None else 0
     autumn_credits = credits_result[1] if credits_result and credits_result[1] is not None else 0
 
-    # 查找 `student_table` 表中 `course_category` 为 "英语" 的课程
+    # 定义查询逻辑
     english_query = text(f"""
-        SELECT academic_year
-        FROM `{student_table}`
-        WHERE course_category = '英语';
+        SELECT
+            SUM(CASE WHEN s.academic_year LIKE "%春季%" THEN s.credits ELSE 0 END) AS spring_credits,
+            SUM(CASE WHEN s.academic_year LIKE "%秋季%" THEN s.credits ELSE 0 END) AS autumn_credits
+        FROM `{student_table}` s
+        WHERE s.course_category = "英语"
+        AND s.final_grade >= 60;
     """)
 
+    # 执行查询并提取结果
     with engine.connect() as connection:
-        english_academic_years = [row[0] for row in connection.execute(english_query).fetchall()]
+        result = connection.execute(english_query).fetchone()
 
-    # 移除在相同学年里 "大学外语" 的课程
-    missing_courses = [
-        (course_name, academic_year)
-        for course_name, academic_year in missing_courses
-        if not (course_name == '大学外语' and academic_year in english_academic_years)
-    ]
+    # 解析查询结果
+    english_spring_credits = result[0] if result and result[0] is not None else 0
+    english_autumn_credits = result[1] if result and result[1] is not None else 0
 
-    # 只保留课程名用于输出
-    missing_course_names = [course[0] for course in missing_courses]
 
-    return spring_credits, autumn_credits, missing_course_names
+
+    return spring_credits+english_spring_credits, autumn_credits+english_autumn_credits
+
+# 测试用例
+# spring_credits, autumn_credits = process_courses('乔宇凡_2021113352_计算机科学与技术', 'required_course_1')
+# print(f"Spring Credits: {spring_credits}, Autumn Credits: {autumn_credits}")
