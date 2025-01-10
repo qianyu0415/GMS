@@ -13,8 +13,8 @@ def process_calculate_limited(student_table, limited_course_table):
     
     query = text(f"""
         SELECT SUM(s.credits) AS total_credits
-        FROM {student_table} s
-        JOIN {limited_course_table} m ON s.course_name = m.course_name
+        FROM `{student_table}` s
+        JOIN `{limited_course_table}` m ON s.course_name = m.course_name
         WHERE (s.final_grade >= 60 OR s.final_grade = '免修');
     """)
 

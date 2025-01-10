@@ -113,10 +113,10 @@
       data() {
         return {
           loading: false,
-          courseArr: ['数据结构', '操作系统', '数据库系统'],
-          classArr: ['计算机科学 2021', '计算机科学 2022', '软件工程 2021'],
-          professionArr: ['计算机科学', '软件工程', '信息技术'],
-          gradeArr: ['计算机科学 2021', '计算机科学 2022', '软件工程 2021'],
+          courseArr: [],
+          classArr: [],
+          professionArr: [],
+          gradeArr: [],
           professionObj: {},
           batch: false,
           showInput: '',
@@ -130,21 +130,14 @@
             student_name: '',
             major: '',
           },
-          yearArr: [
-            { label: '2021', value: 2021 },
-            { label: '2022', value: 2022 },
-            { label: '2023', value: 2023 }
-          ],
-          termArr: [
-            { label: '上学期', value: 1 },
-            { label: '下学期', value: 2 }
-          ],
+          yearArr: [],
+          termArr: [],
           searchValue: {
             $limit: 10,
             $offset: 0,
           },
-          selection: [], // 存储选中的记录
-          dataTable: [],  // 表格数据初始化为空
+          selection: [], 
+          dataTable: [],  
           baseColumns: [
             { label: '学生姓名', prop: 'student_name', style: 'center', minWidth: '100' },
             { label: '专业', prop: 'major', style: 'center', minWidth: '100' },
@@ -152,17 +145,18 @@
           categoryColumnsMap: {
             '春季必修学分': { label: '春季必修学分', prop: 'spring_required_credits', style: 'center', minWidth: '130' },
             '秋季必修学分': { label: '秋季必修学分', prop: 'autumn_required_credits', style: 'center', minWidth: '130' },
-            '春季核心课程学分': { label: '春季核心课程学分', prop: 'spring_core_credits', style: 'center', minWidth: '150' },
-            '秋季核心课程学分': { label: '秋季核心课程学分', prop: 'autumn_core_credits', style: 'center', minWidth: '150' },
+            '专业核心课程学分': { label: '专业核心课程学分', prop: 'core_credits', style: 'center', minWidth: '150' },
+            // '秋季核心课程学分': { label: '秋季核心课程学分', prop: 'autumn_core_credits', style: 'center', minWidth: '150' },
             '数字逻辑学分': { label: '数字逻辑学分', prop: 'numerical_logic_credits', style: 'center', minWidth: '120' },
-            '春季限选学分': { label: '春季限选学分', prop: 'spring_limited_credits', style: 'center', minWidth: '130' },
-            '秋季限选学分': { label: '秋季限选学分', prop: 'autumn_limited_credits', style: 'center', minWidth: '130' },
+            '专业限选学分': { label: '专业限选学分', prop: 'limited_credits', style: 'center', minWidth: '130' },
+            // '秋季限选学分': { label: '秋季限选学分', prop: 'autumn_limited_credits', style: 'center', minWidth: '130' },
             '企业实训/专业实践': { label: '企业实训/专业实践', prop: 'short_term_training_credits', style: 'center', minWidth: '200' },
             '国际化课程学分': { label: '国际化课程学分', prop: 'international_credits', style: 'center', minWidth: '150' },
             '专业选修学分': { label: '专业选修学分', prop: 'elective_credits', style: 'center', minWidth: '130' },
             '外专业学分': { label: '外专业学分', prop: 'outmajor_credits', style: 'center', minWidth: '120' },
             '素质核心学分': { label: '素质核心学分', prop: 'culture_core_credits', style: 'center', minWidth: '130' },
             '素质选修学分': { label: '素质选修学分', prop: 'culture_choose_credits', style: 'center', minWidth: '130' },
+            'MOOC课程学分列表': { label: 'MOOC课程学分列表', prop: 'MOOC', style: 'center', minWidth: '130' },
             '创新创业学分': { label: '创新创业学分', prop: 'innovation_credits', style: 'center', minWidth: '130' },
           },
           // 始终包含删除操作列
@@ -183,8 +177,7 @@
         getDefault() {
           this.form.year = 2023;
           let month = new Date().getMonth() + 1;
-          this.form.term = month > 2 && month < 6 ? this.termArr[0].value : this.termArr[1].value;
-          // 始终显示所有列，包括操作列
+          this.form.term = this.termArr.length > 0 ? (month > 2 && month < 6 ? this.termArr[0]?.value : this.termArr[1]?.value): '';  // 如果 termArr 为空，则设置默认值          // 始终显示所有列，包括操作列
           this.dataColumns = [...this.baseColumns, ...Object.values(this.categoryColumnsMap), this.operationColumn];
           this.fetchData(this.searchValue);
         },

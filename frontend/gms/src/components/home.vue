@@ -13,7 +13,7 @@
             <!--内容区-->
             <router-view />
             <div class="copyright">
-              Copyright @2020 庄江辉
+              @2024 王乾宇
             </div>
           </el-main>
         </el-container>

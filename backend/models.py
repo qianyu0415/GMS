@@ -9,8 +9,7 @@ class CreditResult(db.Model):
     student_name = db.Column(db.String(100), primary_key=True, nullable=False)
     student_id = db.Column(db.String(15), primary_key=True, nullable=False)
     major = db.Column(db.String(100), primary_key=True, nullable=False)
-    spring_required_credits = db.Column(db.Float)
-    autumn_required_credits = db.Column(db.Float)
+    total_required_credits = db.Column(db.Float)
     core_credits = db.Column(db.Float)
     numerical_logic_credits = db.Column(db.Float)
     limited_credits = db.Column(db.Float)
@@ -20,7 +19,7 @@ class CreditResult(db.Model):
     outmajor_credits = db.Column(db.Float)
     culture_core_credits = db.Column(db.Float)
     culture_choose_credits = db.Column(db.Float)
-    MOOC = db.Column(db.JSON)  # 使用 JSON 类型存储列表
+    culture_mooc_total_credits = db.Column(db.Float)
     innovation_credits = db.Column(db.Float)
 
 # 删除并重新创建表

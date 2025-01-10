@@ -1,12 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import DataTable from '../components/DataTable.vue';
 import Score from '../components/Score.vue';
 import home from '../components/home.vue';
 
 // 定义路由规则
 const routes = [
   {
-    path: '/home',
+    path: '/',
     name: 'home',
     component: home,
     redirect: '/score',

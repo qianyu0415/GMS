@@ -1,23 +1,21 @@
 from sqlalchemy import text
 from db_config import get_engine
-
 # 创建数据库引擎
 engine = get_engine()
 
-def calculate_major_selected_credits(student_table):
-    """
-    根据学生表与 major_selected_courses 表的连接计算总学分。
+# 计算专业选修（表二）九学分
+def calculate_major_selected_credits(student_table,elective_course_table):
 
-    :param student_table: 学生课程表名称
-    :return: 总学分
-    """
+    print("student:", student_table)
+    print("electivte:", elective_course_table)
     try:
         # SQL 查询
         query = text(f"""
             SELECT SUM(m.credits) AS total_credits
-            FROM major_selected_courses m
+            FROM `{elective_course_table}`m
             JOIN `{student_table}` s
-            ON m.course_name = s.course_name;
+            ON m.course_name = s.course_name
+            WHERE (s.final_grade >= 60 OR s.final_grade = '免修');
         """)
 
         # 执行查询
@@ -33,9 +31,9 @@ def calculate_major_selected_credits(student_table):
         print(f"发生错误：{e}")
         return 0
 
-# # 测试代码
-# if __name__ == "__main__":
-#     # 示例学生表
-#     student_table = '乔宇凡_2021113352_计算机科学与技术'
-#     total_credits = calculate_major_credits(student_table)
-#     print(f"{student_table} 的总学分为：{total_credits}")
+# # 测试用例
+# major = "软件工程"
+# limit_course = get_elective_course_table(major)
+# print("dd",limit_course)
+# calculate_major_selected_credits("任奕杨_2021112514_软件工程",limit_course)
+

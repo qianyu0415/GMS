@@ -37,6 +37,8 @@ def allowed_file(filename):
 
 
 # 初始化学生表
+
+import re
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # 确保有文件上传
@@ -63,8 +65,9 @@ def upload_file():
     with db.engine.connect() as connection:
         # 遍历每个学生，创建动态表并插入数据
         for (student_id, student_name, major), student_data in df.groupby(['学号', '姓名', '专业']):
-            # 规范化表名，避免以数字开头
-            table_name = f"{student_name}_{student_id}_{major}"
+            # 替换 student_name 中的空格为 '-'，并确保表名中无非法字符
+            table_name = re.sub(r'[^\w\-一-龥]', '', f"{student_name.replace(' ', '-')}_{student_id}_{major}")
+            table_name = table_name[:64]  # 限制表名长度
 
             # 创建学生表的 SQL 查询
             create_table_query = text(f"""
@@ -82,12 +85,16 @@ def upload_file():
 
             try:
                 connection.execute(create_table_query)
+                print(f"创建表成功: {table_name}")
             except Exception as e:
                 print(f"创建表 {table_name} 时出错: {e}")
                 continue  # 如果创建表失败，跳过此学生
 
             # 插入学生的选课信息
-            for row in student_data.iterrows():
+            for _, row in student_data.iterrows():
+                # 检查并处理 NaN 值
+                row = row.fillna('')  # 替换所有 NaN 为空字符串
+
                 insert_query = text(f"""
                 INSERT INTO `{table_name}` (course_name, academic_year, course_nature, course_category, final_grade, retake_remark, credits, major)
                 VALUES (:course_name, :academic_year, :course_nature, :course_category, :final_grade, :retake_remark, :credits, :major);
@@ -100,12 +107,12 @@ def upload_file():
                         'course_category': row['课程类别'],
                         'final_grade': row['最终成绩'],
                         'retake_remark': row.get('补考重修标记', ''),
-                        'credits': row['学分'],
+                        'credits': row['学分'] if not pd.isna(row['学分']) else 0,  # 将 NaN 替换为 0
                         'major': row['专业']
                     })
                 except Exception as e:
                     print(f"插入数据到 {table_name} 时出错: {e}")
-                    continue  # 如果插入数据失败，跳过此行
+                    continue
 
     # 提交更改
     try:
@@ -119,16 +126,19 @@ def upload_file():
             'password': '123456',
             'database': 'credits_db'
         }
-        
+
         # 日志记录以跟踪学分计算状态
         print("开始学分计算...")
-        calculate_credits_for_all_students(db_config)
+        calculate_credits_for_all_students()
         print("学分计算完成")
 
         return jsonify({'message': '学生选课信息已成功存储在数据库中，并完成学分计算。'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f"提交更改时出错: {e}"}), 500
+
+
+
 
 
 # 删除所有学生表
@@ -160,13 +170,11 @@ def delete_all_student_tables():
         return jsonify({'error': f"删除学生表或 credit_results 记录时出错: {e}"}), 500
 
     
-# 路由：检查缺失课程
+# 路由：检查缺失课程（必修课、专业核心课所差科目）
 @app.route('/check_missing_courses', methods=['POST'])
 def handle_check_missing_courses():
     data = request.json
-    # print("Received data:", data)  # 打印接收到的数据
     result, status_code = check_missing_courses(data)
-    # print(result, status_code)
     return jsonify(result), status_code
 
 @app.route('/data', methods=['GET'])
@@ -178,16 +186,12 @@ def get_data():
         # 将查询结果转换为 JSON 格式
         result_list = []
         for result in credit_results:
-            # 确保 MOOC 是一个 JSON 可序列化的对象
-            mooc_data = result.MOOC if isinstance(result.MOOC, list) else []
-
             result_list.append({
                 'student_name': result.student_name,
                 'student_id': result.student_id,
                 'major': result.major,
                 # 春季秋季的必修未统计
-                'spring_required_credits': result.spring_required_credits or 0,
-                'autumn_required_credits': result.autumn_required_credits or 0,
+                'total_required_credits': result.total_required_credits or 0,
                 # 专业核心课
                 'core_credits': result.core_credits or 0,
                 # 数字逻辑3分
@@ -195,21 +199,21 @@ def get_data():
                 # 春秋限选未统计
                 'limited_credits': result.limited_credits or 0,
                 # 企业短期实训&夏季实践：2分
-                'short_term_training_credits': (result.short_term_training_credits or 0) - 2,
+                'short_term_training_credits': (result.short_term_training_credits or 0) ,
                 # 国际化课程1分
-                'international_credits': (result.international_credits or 0) - 1,
+                'international_credits': (result.international_credits or 0) ,
                 # 专业选修课总分9分
-                'elective_credits': (result.elective_credits or 0) - 9,
+                'elective_credits': (result.elective_credits or 0) ,
                 # 外专业课程6分
-                'outmajor_credits': (result.outmajor_credits or 0) - 6,
+                'outmajor_credits': (result.outmajor_credits or 0) ,
                 # 素质核心4分
                 'culture_core_credits': result.culture_core_credits or 0,
                 # 素质选修5分
                 'culture_choose_credits': result.culture_choose_credits or 0,
-                # MOOC，确保返回列表
-                'MOOC': mooc_data,
+                # 素质核心 + 素质选秀 + mooc
+                'culture_mooc_total_credits': result.culture_mooc_total_credits or 0,
                 # 创新学分4分
-                'innovation_credits': (result.innovation_credits or 0) - 1
+                'innovation_credits': (result.innovation_credits or 0) 
             })
 
         return jsonify(result_list), 200

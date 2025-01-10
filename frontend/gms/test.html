@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Results Test</title>
+</head>
+<body>
+    <h1>Credit Results Data</h1>
+    <button onclick="fetchData()">Fetch Data</button>
+    <div id="results"></div>
+
+    <script>
+        async function fetchData() {
+            try {
+                // 使用 Fetch API 请求后端数据
+                const response = await fetch('http://localhost:5000/data');  // 根据需要修改端口
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                // 清空之前的结果
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '';
+
+                // 检查是否有数据返回
+                if (data.length === 0) {
+                    resultsDiv.innerHTML = '<p>No data available.</p>';
+                    return;
+                }
+
+                // 构建 HTML 表格显示数据
+                const table = document.createElement('table');
+                table.border = '1';
+
+                // 创建表头
+                const header = table.insertRow();
+                const headers = [
+                    'Student Name', 'Student ID', 'Major', 'Spring Required Credits',
+                    'Autumn Required Credits', 'Spring Core Credits', 'Autumn Core Credits',
+                    'Numerical Logic Credits', 'Spring Limited Credits', 'Autumn Limited Credits',
+                    'Short Term Training Credits', 'International Credits', 'Elective Credits',
+                    'Outmajor Credits', 'Culture Core Credits', 'Culture Choose Credits',
+                    'Culture Total Credits', 'Innovation Credits'
+                ];
+                headers.forEach(headerText => {
+                    const th = document.createElement('th');
+                    th.appendChild(document.createTextNode(headerText));
+                    header.appendChild(th);
+                });
+
+                // 填充表格数据
+                data.forEach(result => {
+                    const row = table.insertRow();
+                    row.insertCell().appendChild(document.createTextNode(result.student_name));
+                    row.insertCell().appendChild(document.createTextNode(result.student_id));
+                    row.insertCell().appendChild(document.createTextNode(result.major));
+                    row.insertCell().appendChild(document.createTextNode(result.spring_required_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.autumn_required_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.spring_core_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.autumn_core_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.numerical_logic_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.spring_limited_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.autumn_limited_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.short_term_training_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.international_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.elective_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.outmajor_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.culture_core_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.culture_choose_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.culture_total_credits));
+                    row.insertCell().appendChild(document.createTextNode(result.innovation_credits));
+                });
+
+                // 将表格添加到页面
+                resultsDiv.appendChild(table);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('results').innerHTML = `<p>Error fetching data: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

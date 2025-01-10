@@ -26,15 +26,6 @@ export default {
         this.isRouterAlive = true;
       });
     },
-    getSilent() {
-      axios.get('/api/sms/user/getSilent').then(response => {
-        const data = response.data;
-        this.$store.commit('SAVE_SILENT', data);
-      });
-    },
-  },
-  mounted() {
-    this.getSilent();
   },
   computed: {
     silent() {

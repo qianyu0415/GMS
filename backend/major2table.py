@@ -87,6 +87,24 @@ def get_limited_course_table(major, student_name=None):
 
     return limited_course_map.get(major, None)
 
+# 根据专业获取专业选修（表二）九学分
+def get_elective_course_table(major):
+    """
+    根据专业获取对应的必修课表名。
+    """
+    elective_course_map = {
+        "计算机科学与技术": "elective_course_1",
+        "数据科学与大数据技术": "elective_course_2",
+        "人工智能": "elective_course_3",
+        "网络空间安全": "elective_course_4",
+        "信息安全": "elective_course_5",
+        "软件工程": "elective_course_6",
+        "物联网工程": "elective_course_7",
+        "生物信息学": "elective_course_8",
+    }
+    return elective_course_map.get(major, None)
+
+
 # 测试用例
 # if __name__ == "__main__":
 #     # 测试获取小专业

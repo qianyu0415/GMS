@@ -50,13 +50,13 @@ def calculate_short_term_training_credits(student_table):
         print(f"发生错误：{e}")
         return 0
     
-if __name__ == "__main__":
-    # 测试软件工程专业
-    student_table = '乔宇凡_2021113352_计算机科学与技术'
-    credits = calculate_short_term_training_credits(student_table)
-    print(f"{student_table} 的企业短期实训总学分为：{credits}")
+# if __name__ == "__main__":
+#     # 测试软件工程专业
+#     student_table = '乔宇凡_2021113352_计算机科学与技术'
+#     credits = calculate_short_term_training_credits(student_table)
+#     print(f"{student_table} 的企业短期实训总学分为：{credits}")
 
-    # 测试其他专业
-    student_table = '任奕杨_2021112514_软件工程'
-    credits = calculate_short_term_training_credits(student_table)
-    print(f"{student_table} 的企业短期实训和专业实践总学分为：{credits}")
+#     # 测试其他专业
+#     student_table = '任奕杨_2021112514_软件工程'
+#     credits = calculate_short_term_training_credits(student_table)
+#     print(f"{student_table} 的企业短期实训和专业实践总学分为：{credits}")
